@@ -1,4 +1,4 @@
-FROM ubuntu:jammy
+FROM ubuntu:jammy as build
 
 # set up the OS and Galaxy with embedded conda that handles ALL python
 RUN apt update \
@@ -19,5 +19,23 @@ RUN /galaxy/database/dependencies/_conda/bin/conda init bash \
 
 # config galaxy to expose 0.0.0.0:8080
 COPY galaxy.yml /galaxy/config/
-RUN ls /galaxy/config > /tmp/info
-CMD ["/bin/bash", "-c", "sh run.sh"]
+
+# cleanup
+RUN rm -rf /galaxy/.venv/src \
+  && rm -rf /galaxy/client/node_modules \
+  && bash -i -c 'conda clean --packages -t -i -y' \
+  && find /galaxy/ -name '*.pyc' -delete | true
+
+# take built galaxy and jam it in a new container
+FROM ubuntu:jammy
+
+RUN useradd -ms /bin/bash galaxy \
+  && mkdir /galaxy \
+  && chown galaxy:galaxy /galaxy
+
+USER galaxy
+
+COPY --from=build /galaxy /galaxy
+COPY --from=build /home/galaxy/.bashrc /home/galaxy/
+
+CMD ["/bin/bash", "-c", "sh /galaxy/run.sh"]
