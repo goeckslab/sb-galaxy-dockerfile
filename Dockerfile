@@ -17,14 +17,21 @@ WORKDIR /galaxy
 RUN /galaxy/database/dependencies/_conda/bin/conda init bash \
   && bash -i -c scripts/common_startup.sh
 
-# config galaxy to expose 0.0.0.0:8080
-COPY galaxy.yml /galaxy/config/
-
 # cleanup
 RUN rm -rf /galaxy/.venv/src \
   && rm -rf /galaxy/client/node_modules \
   && bash -i -c 'conda clean --packages -t -i -y' \
   && find /galaxy/ -name '*.pyc' -delete | true
+
+# add galaxy config to expose 0.0.0.0:8080
+COPY galaxy.yml /galaxy/config/galaxy.yml
+
+# add startup script that does some environment sensing
+COPY run_galaxy.sh /galaxy/run_galaxy.sh
+
+# for some reason COPY --chown isn't working >:(
+USER root
+RUN chown galaxy:galaxy /galaxy/config/galaxy.yml /galaxy/run_galaxy.sh
 
 # take built galaxy and jam it in a new container
 FROM ubuntu:jammy
@@ -38,4 +45,6 @@ USER galaxy
 COPY --from=build /galaxy /galaxy
 COPY --from=build /home/galaxy/.bashrc /home/galaxy/
 
-CMD ["/bin/bash", "-c", "sh /galaxy/run.sh"]
+WORKDIR /galaxy
+
+CMD ["/bin/bash", "/galaxy/run_galaxy.sh"]
