@@ -51,4 +51,4 @@ if [ -n "$yaml_string" ]; then
 fi
 
 # actually start galaxy server
-sh run.sh
+source .venv/bin/activate && galaxyctl start && galaxyctl follow
